@@ -491,13 +491,7 @@
                 <input type="text" id="searchInput" placeholder="Поиск по названию, компании или навыкам..." oninput="filterJobs()">
             </div>
             <div style="display: flex; align-items: center; gap: 0.5rem;">
-                <label style="font-size: 0.85rem; color: var(--text-muted);">📍 Локация:</label>
-                <select id="locationFilter" style="padding: 0.75rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-main); outline: none;">
-                    <option value="kz_all" selected>🇰🇿 Все (Remote + Астана + Алматы)</option>
-                    <option value="kz_remote">🌐 Полная Удаленка (Казахстан)</option>
-                    <option value="astana">🏙️ Офис Астана</option>
-                    <option value="almaty">🌆 Офис Алматы</option>
-                </select>
+                <span style="font-size: 0.85rem; color: var(--text-muted); padding: 0.5rem 0.8rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px;">📍 🇰🇿 Remote · Астана · Алматы</span>
             </div>
             <div style="display: flex; align-items: center; gap: 0.5rem;">
                 <label style="font-size: 0.85rem; color: var(--text-muted);">🗓️ Свежесть:</label>
@@ -768,21 +762,14 @@
         async function importHhKz() {
             const btn = document.getElementById('importHhKzBtn');
             const days = document.getElementById('daysFilter').value || 7;
-            const locationMode = document.getElementById('locationFilter').value || 'kz_all';
-            const locationLabels = {
-                'kz_all': '🇰🇿 Remote + Астана + Алматы',
-                'kz_remote': '🌐 Полная Удаленка',
-                'astana': '🏙️ Офис Астана',
-                'almaty': '🌆 Офис Алматы'
-            };
             btn.innerHTML = `<span class="loader"></span> Сканируем HH.kz...`;
             btn.disabled = true;
 
             try {
-                const res = await fetch(`/import/hh_kz?days=${days}&location_mode=${locationMode}`, { method: 'POST' });
+                const res = await fetch(`/import/hh_kz?days=${days}&location_mode=kz_all`, { method: 'POST' });
                 if (res.ok) {
                     const data = await res.json();
-                    alert(`✅ Импортировано с HeadHunter Казахстан (hh.kz):\n\nВакансий: ${data.imported_count}\nЛокация: ${locationLabels[locationMode]}\nСвежесть: за ${days} дн.`);
+                    alert(`✅ Готово! Найдено вакансий с HH.kz: ${data.imported_count}\n(🇰🇿 Remote + Астана + Алматы, за ${days} дн.)`);
                     fetchJobs();
                 } else {
                     alert("Ошибка сканирования HH.kz");
@@ -798,21 +785,14 @@
         async function importAllSites() {
             const btn = document.getElementById('importAllBtn');
             const days = document.getElementById('daysFilter').value || 7;
-            const locationMode = document.getElementById('locationFilter').value || 'kz_all';
-            const locationLabels = {
-                'kz_all': '🇰🇿 Remote + Астана + Алматы',
-                'kz_remote': '🌐 Полная Удаленка',
-                'astana': '🏙️ Офис Астана',
-                'almaty': '🌆 Офис Алматы'
-            };
             btn.innerHTML = `<span class="loader"></span> Сканируем все сайты...`;
             btn.disabled = true;
 
             try {
-                const res = await fetch(`/import/all?days=${days}&location_mode=${locationMode}`, { method: 'POST' });
+                const res = await fetch(`/import/all?days=${days}&location_mode=kz_all`, { method: 'POST' });
                 if (res.ok) {
                     const data = await res.json();
-                    alert(`✅ Импорт завершен!\n\nВакансий: ${data.imported_count}\nЛокация: ${locationLabels[locationMode]}\nСвежесть: за ${days} дн.\nИсточники: HH.kz, Habr Career, HH.ru Remote, Remotive`);
+                    alert(`✅ Готово! Найдено вакансий: ${data.imported_count}\n(🇰🇿 Remote + Астана + Алматы, за ${days} дн.)\nИсточники: HH.kz, Habr Career, HH.ru Remote, Remotive`);
                     fetchJobs();
                 } else {
                     alert("Ошибка сканирования сайтов");
@@ -824,6 +804,7 @@
                 btn.disabled = false;
             }
         }
+
 
 
 
