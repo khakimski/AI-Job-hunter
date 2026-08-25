@@ -28,18 +28,18 @@ async def send_telegram_alert(
     
     skills_text = ", ".join(matching_skills[:5]) if matching_skills else "N/A"
     missing_text = ", ".join(missing_skills[:3]) if missing_skills else "None"
-    job_link = f"[Ссылка на вакансию]({url})" if url else ""
+    job_link = f'<a href="{url}">🔗 Ссылка на вакансию</a>' if url else ""
 
     message = (
-        f"{emoji} *Новая подходящая вакансия!* ({match_score}% match)\n\n"
-        f"📌 *Должность:* {title}\n"
-        f"🏢 *Компания:* {company or 'Не указана'}\n"
-        f"📍 *Локация:* {location or 'Удаленно / Не указана'}\n"
-        f"🎯 *Грейд:* {seniority}\n"
-        f"💡 *Рекомендация:* {recommendation}\n\n"
-        f"✅ *Совпавшие навыки:* {skills_text}\n"
-        f"⚠️ *Изучить:* {missing_text}\n\n"
-        f"📝 *ИИ Вывод:* {summary}\n\n"
+        f"{emoji} <b>Новая подходящая вакансия!</b> ({match_score}% match)\n\n"
+        f"📌 <b>Должность:</b> {title}\n"
+        f"🏢 <b>Компания:</b> {company or 'Не указана'}\n"
+        f"📍 <b>Локация:</b> {location or 'Удаленно / Не указана'}\n"
+        f"🎯 <b>Грейд:</b> {seniority}\n"
+        f"💡 <b>Рекомендация:</b> {recommendation}\n\n"
+        f"✅ <b>Совпавшие навыки:</b> {skills_text}\n"
+        f"⚠️ <b>Изучить:</b> {missing_text}\n\n"
+        f"📝 <b>ИИ Вывод:</b> {summary}\n\n"
         f"{job_link}"
     )
 
@@ -47,7 +47,7 @@ async def send_telegram_alert(
     payload = {
         "chat_id": chat_id,
         "text": message,
-        "parse_mode": "Markdown",
+        "parse_mode": "HTML",
         "disable_web_page_preview": False
     }
 

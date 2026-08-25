@@ -159,7 +159,8 @@ Analyze the match and respond with ONLY a valid JSON object with the following f
 - "recommendation": string ("HIGHLY_RECOMMENDED" if match_score >= 75, "CONSIDER" if 50-74, "NOT_RECOMMENDED" if < 50).
 - "summary": string (2-3 sentences in Russian explaining why this job matches or what is missing).
 """
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={api_key}"
+
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {"responseMimeType": "application/json"},

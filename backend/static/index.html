@@ -518,12 +518,16 @@
                 const matchingTags = (job.matching_skills || []).map(s => `<span class="skill-tag skill-match">✓ ${s}</span>`).join('');
                 const missingTags = (job.missing_skills || []).map(s => `<span class="skill-tag">✗ ${s}</span>`).join('');
 
+                const openLink = job.url ? `<a href="${job.url}" target="_blank" class="btn btn-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.8rem; text-decoration: none; display: inline-flex; align-items: center; gap: 0.3rem;">🔗 Открыть вакансию ↗</a>` : '';
+
                 return `
                     <div class="job-card">
                         <div>
                             <div class="card-header">
                                 <div>
-                                    <div class="job-title">${job.title}</div>
+                                    <div class="job-title">
+                                        ${job.url ? `<a href="${job.url}" target="_blank" style="color: inherit; text-decoration: underline; text-decoration_color: var(--accent-primary);">${job.title} ↗</a>` : job.title}
+                                    </div>
                                     <div class="company-name">${job.company || 'Компания не указана'}</div>
                                 </div>
                                 <div class="score-badge ${badgeClass}">${job.match_score}%</div>
@@ -538,11 +542,12 @@
                         </div>
                         <div class="card-footer">
                             <span>Грейд: <strong>${job.seniority_level || 'N/A'}</strong></span>
-                            <span>${job.created_at ? new Date(job.created_at).toLocaleDateString('ru-RU') : ''}</span>
+                            ${openLink}
                         </div>
                     </div>
                 `;
             }).join('');
+
         }
 
         function filterJobs() {
