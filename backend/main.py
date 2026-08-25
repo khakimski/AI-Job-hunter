@@ -265,23 +265,38 @@ Analyze the match and respond with ONLY a valid JSON object with the following f
 
 
 @app.post("/import/all")
-async def import_all_sites(days: int = 7, limit_per_site: int = 3, db: Session = Depends(get_db)):
+async def import_all_sites(
+    days: int = 7,
+    limit_per_site: int = 3,
+    location_mode: str = "kz_all",
+    db: Session = Depends(get_db)
+):
+    """
+    Imports jobs from all sources filtered for Kazakhstan availability:
+    - HH.kz: Remote / Astana office / Almaty office (based on location_mode)
+    - HH.ru: Remote only (accessible from Kazakhstan)
+    - Habr Career: Remote (СНГ-friendly)
+    - Remotive: Worldwide remote
+    location_mode options: kz_all | kz_remote | astana | almaty
+    """
     imported_count = 0
     all_jobs = []
 
-    # Fetch from HH.kz (Казахстан)
-    hh_kz_jobs = await scrape_hh_kz_jobs(query="Python AI", days=days, limit=limit_per_site)
+    # HH.kz — remote + Astana + Almaty (or filtered by mode)
+    hh_kz_jobs = await scrape_hh_kz_jobs(
+        query="Python AI Automation", location_mode=location_mode, days=days, limit=limit_per_site
+    )
     all_jobs.extend(hh_kz_jobs)
 
-    # Fetch from Habr Career
+    # Habr Career — remote СНГ (always accessible from Kazakhstan)
     habr_jobs = await scrape_habr_jobs(query="Python AI", limit=limit_per_site)
     all_jobs.extend(habr_jobs)
 
-    # Fetch from HH.ru (Россия)
+    # HH.ru — remote only (accessible from Kazakhstan)
     hh_jobs = await scrape_hh_jobs(query="Python AI", days=days, limit=limit_per_site)
     all_jobs.extend(hh_jobs)
 
-    # Fetch from Remotive (Global Remote)
+    # Remotive — worldwide remote
     remotive_jobs = await fetch_remotive_jobs(limit=limit_per_site)
     all_jobs.extend(remotive_jobs)
 
@@ -300,13 +315,25 @@ async def import_all_sites(days: int = 7, limit_per_site: int = 3, db: Session =
         "status": "ok",
         "imported_count": imported_count,
         "days_filter": days,
-        "sources": ["HH.kz (Казахстан)", "Habr Career", "HH.ru", "Remotive"],
+        "location_mode": location_mode,
+        "sources": ["HH.kz (Казахстан)", "Habr Career", "HH.ru Remote", "Remotive Worldwide"],
     }
 
 
 @app.post("/import/hh_kz")
-async def import_hh_kz_endpoint(days: int = 7, limit: int = 5, db: Session = Depends(get_db)):
-    jobs = await scrape_hh_kz_jobs(query="Python AI", days=days, limit=limit)
+async def import_hh_kz_endpoint(
+    days: int = 7,
+    limit: int = 5,
+    location_mode: str = "kz_all",
+    db: Session = Depends(get_db)
+):
+    """
+    Imports from HH.kz with Kazakhstan location filter:
+    location_mode: kz_all | kz_remote | astana | almaty
+    """
+    jobs = await scrape_hh_kz_jobs(
+        query="Python AI Automation", location_mode=location_mode, days=days, limit=limit
+    )
     for item in jobs:
         job_input = JobInput(
             title=item["title"],
@@ -316,7 +343,7 @@ async def import_hh_kz_endpoint(days: int = 7, limit: int = 5, db: Session = Dep
             description=item["description"],
         )
         await analyze_job(JobAnalysisRequest(job=job_input), db=db)
-    return {"status": "ok", "imported_count": len(jobs), "days_filter": days}
+    return {"status": "ok", "imported_count": len(jobs), "days_filter": days, "location_mode": location_mode}
 
 
 

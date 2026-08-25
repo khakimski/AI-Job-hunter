@@ -10,26 +10,59 @@ HEADERS = {
     "Accept-Language": "ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7",
 }
 
+# HH Kazakhstan Area IDs
+ASTANA_AREA_ID = "159"
+ALMATY_AREA_ID = "160"
 
-async def scrape_hh_kz_jobs(query: str = "Python AI Automation", days: int = 7, limit: int = 5) -> list:
-    url = f"https://hh.kz/search/vacancy?text={query}&search_period={days}&order_by=publication_time"
+
+async def scrape_hh_kz_jobs(query: str = "Python AI Automation", location_mode: str = "kz_all", days: int = 7, limit: int = 5) -> list:
+    """
+    Scrapes HeadHunter Kazakhstan (hh.kz) based on Kazakhstan location criteria:
+    - location_mode = 'kz_remote': Full Remote
+    - location_mode = 'astana': Office/Hybrid in Astana (area 159)
+    - location_mode = 'almaty': Office/Hybrid in Almaty (area 160)
+    - location_mode = 'kz_all': Combination of Remote + Astana + Almaty
+    """
     jobs = []
+    urls_to_fetch = []
+
+    if location_mode == "kz_remote":
+        urls_to_fetch.append((f"https://hh.kz/search/vacancy?text={query}&schedule=remote&search_period={days}&order_by=publication_time", "Удаленно (Казахстан)"))
+    elif location_mode == "astana":
+        urls_to_fetch.append((f"https://hh.kz/search/vacancy?text={query}&area={ASTANA_AREA_ID}&search_period={days}&order_by=publication_time", "Офис / Гибрид (Астана)"))
+    elif location_mode == "almaty":
+        urls_to_fetch.append((f"https://hh.kz/search/vacancy?text={query}&area={ALMATY_AREA_ID}&search_period={days}&order_by=publication_time", "Офис / Гибрид (Алматы)"))
+    else:  # kz_all: combined remote + Astana + Almaty
+        urls_to_fetch.append((f"https://hh.kz/search/vacancy?text={query}&schedule=remote&search_period={days}&order_by=publication_time", "Удаленно (Казахстан)"))
+        urls_to_fetch.append((f"https://hh.kz/search/vacancy?text={query}&area={ASTANA_AREA_ID}&search_period={days}&order_by=publication_time", "Офис / Гибрид (Астана)"))
+        urls_to_fetch.append((f"https://hh.kz/search/vacancy?text={query}&area={ALMATY_AREA_ID}&search_period={days}&order_by=publication_time", "Офис / Гибрид (Алматы)"))
+
+    seen_vids = set()
+
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.get(url, headers=HEADERS, follow_redirects=True)
-            if resp.status_code == 200:
-                vids = list(set(re.findall(r'/vacancy/(\d+)', resp.text)))[:limit]
-                for vid in vids:
-                    jobs.append({
-                        "title": f"Vacancy #{vid} (HH.kz)",
-                        "company": "HeadHunter Казахстан (hh.kz)",
-                        "location": "Казахстан / Удаленно",
-                        "url": f"https://hh.kz/vacancy/{vid}",
-                        "description": f"Свежая вакансия с HeadHunter Казахстан (hh.kz) ID: {vid}. Позиция {query}. Опубликована за последние {days} дн. Кликай ссылку для просмотра на hh.kz.",
-                        "source": "HH.kz (Казахстан)"
-                    })
+            for url, loc_label in urls_to_fetch:
+                resp = await client.get(url, headers=HEADERS, follow_redirects=True)
+                if resp.status_code == 200:
+                    vids = list(set(re.findall(r'/vacancy/(\d+)', resp.text)))
+                    for vid in vids:
+                        if vid not in seen_vids:
+                            seen_vids.add(vid)
+                            jobs.append({
+                                "title": f"Vacancy #{vid} (HH.kz)",
+                                "company": "HeadHunter Казахстан (hh.kz)",
+                                "location": loc_label,
+                                "url": f"https://hh.kz/vacancy/{vid}",
+                                "description": f"Вакансия с HeadHunter Казахстан (hh.kz) ID: {vid}. Позиция {query}. Локация: {loc_label}. За последние {days} дн.",
+                                "source": "HH.kz"
+                            })
+                            if len(jobs) >= limit:
+                                break
+                if len(jobs) >= limit:
+                    break
     except Exception as e:
         logger.error(f"Error scraping HH.kz: {e}")
+
     return jobs
 
 
@@ -48,9 +81,9 @@ async def scrape_habr_jobs(query: str = "Python AI", limit: int = 5) -> list:
                     jobs.append({
                         "title": title.strip(),
                         "company": "Хабр Карьера",
-                        "location": "Remote / СНГ",
+                        "location": "Удаленно / Доступно из Казахстана",
                         "url": full_url,
-                        "description": f"Вакансия с Хабр Карьера: {title.strip()}. Кликай по ссылке для подробностей.",
+                        "description": f"Удаленная вакансия с Хабр Карьера: {title.strip()}. Доступна для специалистов из СНГ/Казахстана.",
                         "source": "Habr Career"
                     })
     except Exception as e:
@@ -59,7 +92,7 @@ async def scrape_habr_jobs(query: str = "Python AI", limit: int = 5) -> list:
 
 
 async def scrape_hh_jobs(query: str = "Python AI", days: int = 7, limit: int = 5) -> list:
-    url = f"https://hh.ru/search/vacancy?text={query}&search_period={days}&order_by=publication_time"
+    url = f"https://hh.ru/search/vacancy?text={query}&schedule=remote&search_period={days}&order_by=publication_time"
     jobs = []
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
@@ -68,12 +101,12 @@ async def scrape_hh_jobs(query: str = "Python AI", days: int = 7, limit: int = 5
                 vids = list(set(re.findall(r'/vacancy/(\d+)', resp.text)))[:limit]
                 for vid in vids:
                     jobs.append({
-                        "title": f"Vacancy #{vid} (HH.ru)",
-                        "company": "HeadHunter Россия (hh.ru)",
-                        "location": "Удаленно / Россия",
+                        "title": f"Vacancy #{vid} (HH.ru Remote)",
+                        "company": "HeadHunter (Remote)",
+                        "location": "Полная Удаленка",
                         "url": f"https://hh.ru/vacancy/{vid}",
-                        "description": f"Вакансия с HeadHunter (HH.ru) ID: {vid}. Позиция {query}. За последние {days} дн. Кликай ссылку для просмотра на HH.ru.",
-                        "source": "HH.ru"
+                        "description": f"Удаленная вакансия с HeadHunter ID: {vid}. Позиция {query}. За последние {days} дн.",
+                        "source": "HH.ru Remote"
                     })
     except Exception as e:
         logger.error(f"Error scraping HH.ru: {e}")
@@ -92,7 +125,7 @@ async def fetch_remotive_jobs(limit: int = 5) -> list:
                     jobs.append({
                         "title": item.get("title", "Remote Developer"),
                         "company": item.get("company_name", "Remotive"),
-                        "location": item.get("candidate_required_location", "Remote"),
+                        "location": "Worldwide Full Remote",
                         "url": item.get("url"),
                         "description": item.get("description", "")[:2000],
                         "source": "Remotive"
