@@ -148,75 +148,119 @@ def clear_all_jobs(db: Session = Depends(get_db)):
     return {"status": "ok", "deleted_count": deleted_count}
 
 
+# ---------- Keyword-based fast scorer (zero API tokens) ----------
+KEYWORD_SKILLS = [
+    "chatbot", "conversational ai", "nlp", "nlu", "dialogue", "intent",
+    "automation", "no-code", "low-code", "n8n", "zapier", "make.com",
+    "voiceflow", "botpress", "python", "fastapi", "ai", "ml", "llm",
+    "openai", "gemini", "gpt", "rasa", "telegram bot", "support automation",
+    "workflow", "crm", "api", "remote", "удаленно", "чат-бот", "автоматизация",
+]
+
+def keyword_score(text: str) -> tuple[int, list, list]:
+    """Return (score 0-100, matching_keywords, missing_keywords) using pure keyword matching."""
+    text_lower = (text or "").lower()
+    matched = [kw for kw in KEYWORD_SKILLS if kw in text_lower]
+    score = min(100, int(len(matched) / max(len(KEYWORD_SKILLS), 1) * 100) + 30)
+    missing = [kw for kw in ["python", "automation", "chatbot", "nlp"] if kw not in text_lower]
+    return score, matched, missing
+# ------------------------------------------------------------------
+
+
 @app.post("/analyze", response_model=JobAnalysisResponse)
 async def analyze_job(request: JobAnalysisRequest, db: Session = Depends(get_db)):
     job = request.job
-    
-    # Load custom user resume if not provided explicitly
+
+    # ── 1. URL deduplication — skip already stored jobs ──
+    if job.url:
+        existing = db.query(JobRecord).filter(JobRecord.url == job.url).first()
+        if existing:
+            return JobAnalysisResponse(
+                id=existing.id, job_id=existing.id,
+                title=existing.title, company=existing.company,
+                location=existing.location, url=existing.url,
+                match_score=existing.match_score,
+                seniority_level=existing.seniority_level,
+                required_skills=existing.required_skills,
+                matching_skills=existing.matching_skills,
+                missing_skills=existing.missing_skills,
+                recommendation=existing.recommendation,
+                summary=existing.summary,
+                ai_status="CACHED",
+            )
+
+    # ── 2. Fast keyword pre-score (0 tokens) ──
+    combined_text = f"{job.title} {job.description or ''}"
+    kw_score, kw_matched, kw_missing = keyword_score(combined_text)
+
     profile_data = load_user_profile()
     user_profile = request.user_profile or profile_data.get("resume", "")
     min_score_threshold = profile_data.get("min_score", 70)
-
     api_key = os.getenv("GEMINI_API_KEY")
 
-    # Default fallback values if AI is not available
-    match_score = 65
-    seniority_level = "Middle"
-    required_skills = ["Python", "FastAPI", "REST API"]
-    matching_skills = ["Python", "FastAPI"]
-    missing_skills = ["PostgreSQL"]
-    recommendation = "CONSIDER"
-    summary = "Базовый анализ: Вакансия частично совпадает с профилем (Python/FastAPI). Добавьте GEMINI_API_KEY для полного ИИ-скоринга."
-    ai_status = "MOCK_FALLBACK"
+    # Defaults from keyword scoring
+    match_score = kw_score
+    seniority_level = "Unknown"
+    required_skills = kw_matched[:8]
+    matching_skills = kw_matched[:5]
+    missing_skills = kw_missing
+    recommendation = "HIGHLY_RECOMMENDED" if kw_score >= 75 else "CONSIDER" if kw_score >= 50 else "NOT_RECOMMENDED"
+    summary = f"Keyword-анализ: совпало {len(kw_matched)} ключевых слов. Скор: {kw_score}/100."
+    ai_status = "KEYWORD_ONLY"
 
-    if api_key:
-        prompt = f"""
-You are an expert AI Career Coach and Recruiter. Analyze the following job description against the user's custom profile and resume.
+    # ── 3. Gemini AI only if keyword score ≥ 40 (promising job) AND API key available ──
+    if api_key and kw_score >= 40:
+        # Trim description to max 800 chars to save tokens
+        short_desc = (job.description or "")[:800]
+        # Trim resume to first 1200 chars to save tokens
+        short_resume = (user_profile or "")[:1200]
 
-### Candidate Profile & Resume:
-{user_profile}
+        prompt = f"""You are an AI Career Coach. Analyze the job vs candidate profile. Respond ONLY with valid JSON.
 
-### Job Details:
+Profile (excerpt):
+{short_resume}
+
+Job:
 - Title: {job.title}
-- Company: {job.company or 'N/A'}
 - Location: {job.location or 'N/A'}
-- Description: {job.description}
+- Description: {short_desc}
 
-### Task:
-Analyze the match and respond with ONLY a valid JSON object with the following fields:
-- "match_score": integer between 0 and 100 indicating how well the candidate fits this job.
-- "seniority_level": string (e.g. "Junior", "Middle", "Senior", "Lead", "Unknown").
-- "required_skills": list of key technical and soft skills required by the job.
-- "matching_skills": list of skills the candidate possesses based on profile/resume.
-- "missing_skills": list of required skills the candidate seems to lack or should learn.
-- "recommendation": string ("HIGHLY_RECOMMENDED" if match_score >= 75, "CONSIDER" if 50-74, "NOT_RECOMMENDED" if < 50).
-- "summary": string (2-3 sentences in Russian explaining why this job matches or what is missing).
-"""
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={api_key}"
+JSON fields required:
+{{"match_score": 0-100, "seniority_level": "Junior|Middle|Senior|Lead", "required_skills": [...], "matching_skills": [...], "missing_skills": [...], "recommendation": "HIGHLY_RECOMMENDED|CONSIDER|NOT_RECOMMENDED", "summary": "2 sentences in Russian"}}"""
+
+        gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={api_key}"
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"responseMimeType": "application/json"},
+            "generationConfig": {"responseMimeType": "application/json", "maxOutputTokens": 512},
         }
-
         try:
             async with httpx.AsyncClient(timeout=30.0) as client:
-                res = await client.post(url, json=payload)
+                res = await client.post(gemini_url, json=payload)
                 if res.status_code == 200:
                     data = res.json()
                     raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
                     parsed_ai = json.loads(raw_text)
-
-                    match_score = parsed_ai.get("match_score", 0)
+                    match_score = parsed_ai.get("match_score", kw_score)
                     seniority_level = parsed_ai.get("seniority_level", "Unknown")
                     required_skills = parsed_ai.get("required_skills", [])
                     matching_skills = parsed_ai.get("matching_skills", [])
                     missing_skills = parsed_ai.get("missing_skills", [])
-                    recommendation = parsed_ai.get("recommendation", "CONSIDER")
-                    summary = parsed_ai.get("summary", "")
-                    ai_status = "SUCCESS"
+                    recommendation = parsed_ai.get("recommendation", recommendation)
+                    summary = parsed_ai.get("summary", summary)
+                    ai_status = "AI_SUCCESS"
+                elif res.status_code == 429:
+                    logger.warning("Gemini quota exhausted — falling back to keyword scoring")
+                    ai_status = "QUOTA_EXCEEDED_KEYWORD_FALLBACK"
+                else:
+                    logger.warning(f"Gemini returned {res.status_code}")
+                    ai_status = f"GEMINI_ERROR_{res.status_code}"
         except Exception as e:
             logger.error(f"Gemini API error: {e}")
-            ai_status = "ERROR"
+            ai_status = "ERROR_KEYWORD_FALLBACK"
+    elif kw_score < 40:
+        # Job didn't pass keyword filter — skip Gemini, save tokens
+        ai_status = "SKIPPED_LOW_KW_SCORE"
+
 
     # Save to Database
     db_job = JobRecord(
