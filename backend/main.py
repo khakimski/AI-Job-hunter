@@ -14,12 +14,13 @@ try:
     from backend.database import init_db, get_db, JobRecord
     from backend.telegram import send_telegram_alert
     from backend.profile_manager import load_user_profile, save_user_profile
-    from backend.scrapers import scrape_hh_jobs, scrape_habr_jobs, fetch_remotive_jobs
+    from backend.scrapers import scrape_hh_jobs, scrape_hh_kz_jobs, scrape_habr_jobs, fetch_remotive_jobs
 except ModuleNotFoundError:
     from database import init_db, get_db, JobRecord
     from telegram import send_telegram_alert
     from profile_manager import load_user_profile, save_user_profile
-    from scrapers import scrape_hh_jobs, scrape_habr_jobs, fetch_remotive_jobs
+    from scrapers import scrape_hh_jobs, scrape_hh_kz_jobs, scrape_habr_jobs, fetch_remotive_jobs
+
 
 load_dotenv()
 init_db()
@@ -264,19 +265,23 @@ Analyze the match and respond with ONLY a valid JSON object with the following f
 
 
 @app.post("/import/all")
-async def import_all_sites(limit_per_site: int = 3, db: Session = Depends(get_db)):
+async def import_all_sites(days: int = 7, limit_per_site: int = 3, db: Session = Depends(get_db)):
     imported_count = 0
     all_jobs = []
 
+    # Fetch from HH.kz (Казахстан)
+    hh_kz_jobs = await scrape_hh_kz_jobs(query="Python AI", days=days, limit=limit_per_site)
+    all_jobs.extend(hh_kz_jobs)
+
     # Fetch from Habr Career
-    habr_jobs = await scrape_habr_jobs(query="Python", limit=limit_per_site)
+    habr_jobs = await scrape_habr_jobs(query="Python AI", limit=limit_per_site)
     all_jobs.extend(habr_jobs)
 
-    # Fetch from HH.ru
-    hh_jobs = await scrape_hh_jobs(query="Python", limit=limit_per_site)
+    # Fetch from HH.ru (Россия)
+    hh_jobs = await scrape_hh_jobs(query="Python AI", days=days, limit=limit_per_site)
     all_jobs.extend(hh_jobs)
 
-    # Fetch from Remotive
+    # Fetch from Remotive (Global Remote)
     remotive_jobs = await fetch_remotive_jobs(limit=limit_per_site)
     all_jobs.extend(remotive_jobs)
 
@@ -291,7 +296,28 @@ async def import_all_sites(limit_per_site: int = 3, db: Session = Depends(get_db
         await analyze_job(JobAnalysisRequest(job=job_input), db=db)
         imported_count += 1
 
-    return {"status": "ok", "imported_count": imported_count, "sources": ["HH.ru", "Habr Career", "Remotive"]}
+    return {
+        "status": "ok",
+        "imported_count": imported_count,
+        "days_filter": days,
+        "sources": ["HH.kz (Казахстан)", "Habr Career", "HH.ru", "Remotive"],
+    }
+
+
+@app.post("/import/hh_kz")
+async def import_hh_kz_endpoint(days: int = 7, limit: int = 5, db: Session = Depends(get_db)):
+    jobs = await scrape_hh_kz_jobs(query="Python AI", days=days, limit=limit)
+    for item in jobs:
+        job_input = JobInput(
+            title=item["title"],
+            company=item["company"],
+            location=item["location"],
+            url=item["url"],
+            description=item["description"],
+        )
+        await analyze_job(JobAnalysisRequest(job=job_input), db=db)
+    return {"status": "ok", "imported_count": len(jobs), "days_filter": days}
+
 
 
 @app.post("/import/remotive")

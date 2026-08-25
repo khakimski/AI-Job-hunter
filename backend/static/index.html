@@ -445,8 +445,11 @@
                 <button class="btn btn-secondary" onclick="openProfileModal()">
                     ⚙️ Моё резюме
                 </button>
+                <button class="btn btn-secondary" style="border-color: rgba(16, 185, 129, 0.4); color: #6ee7b7;" onclick="importHhKz()" id="importHhKzBtn">
+                    🇰🇿 Сканировать HH.kz (Казахстан)
+                </button>
                 <button class="btn btn-secondary" onclick="importAllSites()" id="importAllBtn">
-                    🌐 Сканировать HH.ru + Все сайты
+                    🌐 Сканировать Все сайты
                 </button>
                 <button class="btn btn-primary" onclick="openAnalysisModal()">
                     + Вставить вакансию вручную
@@ -457,7 +460,7 @@
         <!-- Active Resume Banner -->
         <div class="resume-banner">
             <div class="resume-info">
-                <h3 id="activeRoleTitle">Активный профиль: Python / FastAPI / AI Developer</h3>
+                <h3 id="activeRoleTitle">Активный профиль: Nursultan Khakim (Conversational AI & Automation Specialist)</h3>
                 <p id="activeResumePreview">Загружается резюме...</p>
             </div>
             <button class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;" onclick="openProfileModal()">
@@ -487,7 +490,17 @@
                 <span class="search-icon">🔍</span>
                 <input type="text" id="searchInput" placeholder="Поиск по названию, компании или навыкам..." oninput="filterJobs()">
             </div>
+            <div style="display: flex; align-items: center; gap: 0.5rem;">
+                <label style="font-size: 0.85rem; color: var(--text-muted);">🗓️ Свежесть:</label>
+                <select id="daysFilter" style="padding: 0.75rem; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-main); outline: none;">
+                    <option value="1">За 24 часа (1 день)</option>
+                    <option value="3">За последние 3 дня</option>
+                    <option value="7" selected>За неделю (7 дней)</option>
+                    <option value="30">За месяц (30 дней)</option>
+                </select>
+            </div>
         </div>
+
 
         <!-- Jobs Grid -->
         <div class="jobs-grid" id="jobsGrid">
@@ -743,16 +756,40 @@
             }
         }
 
+        async function importHhKz() {
+            const btn = document.getElementById('importHhKzBtn');
+            const days = document.getElementById('daysFilter').value || 7;
+            btn.innerHTML = `<span class="loader"></span> Сканируем HH.kz...`;
+            btn.disabled = true;
+
+            try {
+                const res = await fetch(`/import/hh_kz?days=${days}`, { method: 'POST' });
+                if (res.ok) {
+                    const data = await res.json();
+                    alert(`Импортировано и проанализировано вакансий с HeadHunter Казахстан (hh.kz) за ${days} дн.: ${data.imported_count}`);
+                    fetchJobs();
+                } else {
+                    alert("Ошибка сканирования HH.kz");
+                }
+            } catch (err) {
+                alert("Не удалось загрузить вакансии с HH.kz: " + err.message);
+            } finally {
+                btn.innerHTML = `🇰🇿 Сканировать HH.kz (Казахстан)`;
+                btn.disabled = false;
+            }
+        }
+
         async function importAllSites() {
             const btn = document.getElementById('importAllBtn');
+            const days = document.getElementById('daysFilter').value || 7;
             btn.innerHTML = `<span class="loader"></span> Сканируем все сайты...`;
             btn.disabled = true;
 
             try {
-                const res = await fetch('/import/all', { method: 'POST' });
+                const res = await fetch(`/import/all?days=${days}`, { method: 'POST' });
                 if (res.ok) {
                     const data = await res.json();
-                    alert(`Импортировано и проанализировано вакансий с HH.ru, Хабр Карьера и Remotive: ${data.imported_count}`);
+                    alert(`Импортировано и проанализировано вакансий с HH.kz (Казахстан), Хабр Карьера, HH.ru и Remotive за ${days} дн.: ${data.imported_count}`);
                     fetchJobs();
                 } else {
                     alert("Ошибка сканирования сайтов");
@@ -760,10 +797,11 @@
             } catch (err) {
                 alert("Не удалось загрузить вакансии: " + err.message);
             } finally {
-                btn.innerHTML = `🌐 Сканировать HH.ru + Все сайты`;
+                btn.innerHTML = `🌐 Сканировать Все сайты`;
                 btn.disabled = false;
             }
         }
+
 
         // Initial fetch on load
         fetchProfile();
