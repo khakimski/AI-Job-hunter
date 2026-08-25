@@ -13,10 +13,13 @@ from dotenv import load_dotenv
 try:
     from backend.database import init_db, get_db, JobRecord
     from backend.telegram import send_telegram_alert
+    from backend.profile_manager import load_user_profile, save_user_profile
+    from backend.scrapers import scrape_hh_jobs, scrape_habr_jobs, fetch_remotive_jobs
 except ModuleNotFoundError:
     from database import init_db, get_db, JobRecord
     from telegram import send_telegram_alert
-
+    from profile_manager import load_user_profile, save_user_profile
+    from scrapers import scrape_hh_jobs, scrape_habr_jobs, fetch_remotive_jobs
 
 load_dotenv()
 init_db()
@@ -26,8 +29,8 @@ logger = logging.getLogger("jobpilot")
 
 app = FastAPI(
     title="JobPilot AI",
-    description="AI-powered Job Analysis & Career Assistant Platform",
-    version="1.0.0",
+    description="AI-powered Job Analysis & Multi-Site Career Assistant Platform",
+    version="1.1.0",
 )
 
 # Mount static directory for Frontend Dashboard
@@ -50,9 +53,7 @@ class JobInput(BaseModel):
 
 class JobAnalysisRequest(BaseModel):
     job: JobInput
-    user_profile: Optional[str] = (
-        "Python Developer with experience in FastAPI, Docker, PostgreSQL, REST APIs, and AI integrations."
-    )
+    user_profile: Optional[str] = None
 
 
 class JobAnalysisResponse(BaseModel):
@@ -72,6 +73,12 @@ class JobAnalysisResponse(BaseModel):
     ai_status: str
 
 
+class UserProfileSchema(BaseModel):
+    target_role: Optional[str] = "Python / FastAPI / AI Developer"
+    min_score: Optional[int] = 70
+    resume: str
+
+
 @app.get("/")
 def read_root():
     index_file = os.path.join(static_dir, "index.html")
@@ -87,6 +94,17 @@ def health():
         "gemini_key_set": bool(os.getenv("GEMINI_API_KEY")),
         "telegram_configured": bool(os.getenv("TELEGRAM_BOT_TOKEN") and os.getenv("TELEGRAM_CHAT_ID")),
     }
+
+
+@app.get("/profile")
+def get_profile():
+    return load_user_profile()
+
+
+@app.post("/profile")
+def update_profile(profile: UserProfileSchema):
+    updated = save_user_profile(profile.model_dump())
+    return {"status": "updated", "profile": updated}
 
 
 @app.get("/jobs", response_model=List[JobAnalysisResponse])
@@ -123,7 +141,12 @@ def get_jobs(min_score: int = 0, limit: int = 50, db: Session = Depends(get_db))
 @app.post("/analyze", response_model=JobAnalysisResponse)
 async def analyze_job(request: JobAnalysisRequest, db: Session = Depends(get_db)):
     job = request.job
-    user_profile = request.user_profile
+    
+    # Load custom user resume if not provided explicitly
+    profile_data = load_user_profile()
+    user_profile = request.user_profile or profile_data.get("resume", "")
+    min_score_threshold = profile_data.get("min_score", 70)
+
     api_key = os.getenv("GEMINI_API_KEY")
 
     # Default fallback values if AI is not available
@@ -138,9 +161,9 @@ async def analyze_job(request: JobAnalysisRequest, db: Session = Depends(get_db)
 
     if api_key:
         prompt = f"""
-You are an expert AI Career Coach and Recruiter. Analyze the following job description against the user's profile.
+You are an expert AI Career Coach and Recruiter. Analyze the following job description against the user's custom profile and resume.
 
-### User Profile:
+### Candidate Profile & Resume:
 {user_profile}
 
 ### Job Details:
@@ -151,16 +174,15 @@ You are an expert AI Career Coach and Recruiter. Analyze the following job descr
 
 ### Task:
 Analyze the match and respond with ONLY a valid JSON object with the following fields:
-- "match_score": integer between 0 and 100 indicating how well the user fits this job.
+- "match_score": integer between 0 and 100 indicating how well the candidate fits this job.
 - "seniority_level": string (e.g. "Junior", "Middle", "Senior", "Lead", "Unknown").
 - "required_skills": list of key technical and soft skills required by the job.
-- "matching_skills": list of skills the user possesses based on profile.
-- "missing_skills": list of required skills the user seems to lack or should learn.
+- "matching_skills": list of skills the candidate possesses based on profile/resume.
+- "missing_skills": list of required skills the candidate seems to lack or should learn.
 - "recommendation": string ("HIGHLY_RECOMMENDED" if match_score >= 75, "CONSIDER" if 50-74, "NOT_RECOMMENDED" if < 50).
 - "summary": string (2-3 sentences in Russian explaining why this job matches or what is missing).
 """
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key={api_key}"
-
         payload = {
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {"responseMimeType": "application/json"},
@@ -208,8 +230,8 @@ Analyze the match and respond with ONLY a valid JSON object with the following f
     db.commit()
     db.refresh(db_job)
 
-    # Trigger Telegram Alert if high match score
-    if match_score >= 70:
+    # Trigger Telegram Alert if match_score exceeds configured threshold
+    if match_score >= min_score_threshold:
         await send_telegram_alert(
             title=job.title,
             company=job.company or "",
@@ -241,38 +263,80 @@ Analyze the match and respond with ONLY a valid JSON object with the following f
     )
 
 
-@app.post("/import/remotive")
-async def import_remotive_jobs(limit: int = 5, db: Session = Depends(get_db)):
-    remotive_url = "https://remotive.com/api/remote-jobs?category=software-dev&limit=10"
+@app.post("/import/all")
+async def import_all_sites(limit_per_site: int = 3, db: Session = Depends(get_db)):
     imported_count = 0
+    all_jobs = []
 
-    try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
-            resp = await client.get(remotive_url)
-            if resp.status_code != 200:
-                raise HTTPException(status_code=500, detail="Failed to fetch jobs from Remotive API")
+    # Fetch from Habr Career
+    habr_jobs = await scrape_habr_jobs(query="Python", limit=limit_per_site)
+    all_jobs.extend(habr_jobs)
 
-            jobs_data = resp.json().get("jobs", [])[:limit]
+    # Fetch from HH.ru
+    hh_jobs = await scrape_hh_jobs(query="Python", limit=limit_per_site)
+    all_jobs.extend(hh_jobs)
 
-            for item in jobs_data:
-                job_input = JobInput(
-                    title=item.get("title", "Remote Developer"),
-                    company=item.get("company_name"),
-                    location=item.get("candidate_required_location", "Remote"),
-                    url=item.get("url"),
-                    description=item.get("description", "")[:2000],  # truncate html description
-                    publication_date=item.get("publication_date"),
-                    job_type=item.get("job_type"),
-                )
+    # Fetch from Remotive
+    remotive_jobs = await fetch_remotive_jobs(limit=limit_per_site)
+    all_jobs.extend(remotive_jobs)
 
-                # Process via analyze logic
-                await analyze_job(JobAnalysisRequest(job=job_input), db=db)
-                imported_count += 1
+    for item in all_jobs:
+        job_input = JobInput(
+            title=item["title"],
+            company=item["company"],
+            location=item["location"],
+            url=item["url"],
+            description=item["description"],
+        )
+        await analyze_job(JobAnalysisRequest(job=job_input), db=db)
+        imported_count += 1
 
-            return {"status": "ok", "imported_count": imported_count}
-    except Exception as e:
-        logger.error(f"Remotive import error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    return {"status": "ok", "imported_count": imported_count, "sources": ["HH.ru", "Habr Career", "Remotive"]}
+
+
+@app.post("/import/remotive")
+async def import_remotive_endpoint(limit: int = 5, db: Session = Depends(get_db)):
+    jobs = await fetch_remotive_jobs(limit=limit)
+    for item in jobs:
+        job_input = JobInput(
+            title=item["title"],
+            company=item["company"],
+            location=item["location"],
+            url=item["url"],
+            description=item["description"],
+        )
+        await analyze_job(JobAnalysisRequest(job=job_input), db=db)
+    return {"status": "ok", "imported_count": len(jobs)}
+
+
+@app.post("/import/hh")
+async def import_hh_endpoint(limit: int = 5, db: Session = Depends(get_db)):
+    jobs = await scrape_hh_jobs(limit=limit)
+    for item in jobs:
+        job_input = JobInput(
+            title=item["title"],
+            company=item["company"],
+            location=item["location"],
+            url=item["url"],
+            description=item["description"],
+        )
+        await analyze_job(JobAnalysisRequest(job=job_input), db=db)
+    return {"status": "ok", "imported_count": len(jobs)}
+
+
+@app.post("/import/habr")
+async def import_habr_endpoint(limit: int = 5, db: Session = Depends(get_db)):
+    jobs = await scrape_habr_jobs(limit=limit)
+    for item in jobs:
+        job_input = JobInput(
+            title=item["title"],
+            company=item["company"],
+            location=item["location"],
+            url=item["url"],
+            description=item["description"],
+        )
+        await analyze_job(JobAnalysisRequest(job=job_input), db=db)
+    return {"status": "ok", "imported_count": len(jobs)}
 
 
 @app.delete("/jobs/{job_id}")
