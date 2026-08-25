@@ -17,27 +17,47 @@ ALMATY_AREA_ID = "160"
 
 async def scrape_hh_kz_jobs(query: str = "Python AI Automation", location_mode: str = "kz_all", days: int = 7, limit: int = 5) -> list:
     """
-    Scrapes HeadHunter Kazakhstan (hh.kz) based on Kazakhstan location criteria:
-    - location_mode = 'kz_remote': Full Remote
-    - location_mode = 'astana': Office/Hybrid in Astana (area 159)
-    - location_mode = 'almaty': Office/Hybrid in Almaty (area 160)
-    - location_mode = 'kz_all': Combination of Remote + Astana + Almaty
+    Scrapes HeadHunter Kazakhstan (hh.kz) filtered by location:
+    - kz_remote : Full Remote (schedule=remote)
+    - astana    : Office/Hybrid in Astana (area=159)
+    - almaty    : Office/Hybrid in Almaty (area=160)
+    - kz_all    : Remote + Astana + Almaty combined (limit applies per sub-URL)
     """
     jobs = []
     urls_to_fetch = []
 
     if location_mode == "kz_remote":
-        urls_to_fetch.append((f"https://hh.kz/search/vacancy?text={query}&schedule=remote&search_period={days}&order_by=publication_time", "Удаленно (Казахстан)"))
+        urls_to_fetch.append((
+            f"https://hh.kz/search/vacancy?text={query}&schedule=remote&search_period={days}&order_by=publication_time",
+            "Удаленно (Казахстан)"
+        ))
     elif location_mode == "astana":
-        urls_to_fetch.append((f"https://hh.kz/search/vacancy?text={query}&area={ASTANA_AREA_ID}&search_period={days}&order_by=publication_time", "Офис / Гибрид (Астана)"))
+        urls_to_fetch.append((
+            f"https://hh.kz/search/vacancy?text={query}&area={ASTANA_AREA_ID}&search_period={days}&order_by=publication_time",
+            "Офис / Гибрид (Астана)"
+        ))
     elif location_mode == "almaty":
-        urls_to_fetch.append((f"https://hh.kz/search/vacancy?text={query}&area={ALMATY_AREA_ID}&search_period={days}&order_by=publication_time", "Офис / Гибрид (Алматы)"))
-    else:  # kz_all: combined remote + Astana + Almaty
-        urls_to_fetch.append((f"https://hh.kz/search/vacancy?text={query}&schedule=remote&search_period={days}&order_by=publication_time", "Удаленно (Казахстан)"))
-        urls_to_fetch.append((f"https://hh.kz/search/vacancy?text={query}&area={ASTANA_AREA_ID}&search_period={days}&order_by=publication_time", "Офис / Гибрид (Астана)"))
-        urls_to_fetch.append((f"https://hh.kz/search/vacancy?text={query}&area={ALMATY_AREA_ID}&search_period={days}&order_by=publication_time", "Офис / Гибрид (Алматы)"))
+        urls_to_fetch.append((
+            f"https://hh.kz/search/vacancy?text={query}&area={ALMATY_AREA_ID}&search_period={days}&order_by=publication_time",
+            "Офис / Гибрид (Алматы)"
+        ))
+    else:  # kz_all: remote + Astana + Almaty
+        urls_to_fetch.append((
+            f"https://hh.kz/search/vacancy?text={query}&schedule=remote&search_period={days}&order_by=publication_time",
+            "Удаленно (Казахстан)"
+        ))
+        urls_to_fetch.append((
+            f"https://hh.kz/search/vacancy?text={query}&area={ASTANA_AREA_ID}&search_period={days}&order_by=publication_time",
+            "Офис / Гибрид (Астана)"
+        ))
+        urls_to_fetch.append((
+            f"https://hh.kz/search/vacancy?text={query}&area={ALMATY_AREA_ID}&search_period={days}&order_by=publication_time",
+            "Офис / Гибрид (Алматы)"
+        ))
 
     seen_vids = set()
+    # For kz_all, apply limit per URL so each city gets representation
+    per_url_limit = limit if len(urls_to_fetch) == 1 else max(2, limit // len(urls_to_fetch))
 
     try:
         async with httpx.AsyncClient(timeout=15.0) as client:
@@ -45,6 +65,7 @@ async def scrape_hh_kz_jobs(query: str = "Python AI Automation", location_mode: 
                 resp = await client.get(url, headers=HEADERS, follow_redirects=True)
                 if resp.status_code == 200:
                     vids = list(set(re.findall(r'/vacancy/(\d+)', resp.text)))
+                    added = 0
                     for vid in vids:
                         if vid not in seen_vids:
                             seen_vids.add(vid)
@@ -53,13 +74,18 @@ async def scrape_hh_kz_jobs(query: str = "Python AI Automation", location_mode: 
                                 "company": "HeadHunter Казахстан (hh.kz)",
                                 "location": loc_label,
                                 "url": f"https://hh.kz/vacancy/{vid}",
-                                "description": f"Вакансия с HeadHunter Казахстан (hh.kz) ID: {vid}. Позиция {query}. Локация: {loc_label}. За последние {days} дн.",
+                                "description": (
+                                    f"Вакансия с HeadHunter Казахстан (hh.kz) ID: {vid}. "
+                                    f"Позиция: {query}. Локация: {loc_label}. "
+                                    f"Опубликована за последние {days} дн."
+                                ),
                                 "source": "HH.kz"
                             })
-                            if len(jobs) >= limit:
+                            added += 1
+                            if added >= per_url_limit:
                                 break
-                if len(jobs) >= limit:
-                    break
+                else:
+                    logger.warning(f"HH.kz returned status {resp.status_code} for {url}")
     except Exception as e:
         logger.error(f"Error scraping HH.kz: {e}")
 
