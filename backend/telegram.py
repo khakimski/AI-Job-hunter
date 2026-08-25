@@ -57,9 +57,13 @@ async def send_telegram_alert(
             if resp.status_code == 200:
                 logger.info("Telegram alert sent successfully!")
                 return True
+            elif resp.status_code == 403 and "bot can't send messages to the bot" in resp.text:
+                logger.warning("Telegram Alert Error: TELEGRAM_CHAT_ID in .env is set to the bot itself (@khakimski_bot). Please change TELEGRAM_CHAT_ID to your personal Telegram User ID (get it from @userinfobot) or your channel username.")
+                return False
             else:
                 logger.error(f"Failed to send Telegram alert: {resp.status_code} - {resp.text}")
                 return False
+
     except Exception as e:
         logger.error(f"Error sending Telegram notification: {e}")
         return False
