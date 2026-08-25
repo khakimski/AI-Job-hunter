@@ -1,43 +1,72 @@
 # JobPilot AI 🚀
 
-AI-powered Job Discovery & Analysis Assistant.
+AI-powered Job Discovery & Match Analysis Platform.
 
-## 📌 Features
-- **FastAPI Backend**: Fast, lightweight REST API for processing job vacancies.
-- **Docker & Compose**: Fully containerized environment for seamless deployment.
-- **Automated AI Scoring**: Ready for LLM integration (Gemini / OpenAI) to analyze and score job descriptions.
+JobPilot AI — это умный ассистент по поиску и ИИ-анализу вакансий, поддерживающий автоматический парсинг, Gemini 2.5 Flash скоринг, хранение в базе данных и Telegram-уведомления.
 
-## 🛠 Tech Stack
-- **Language:** Python 3.12
-- **Framework:** FastAPI, Pydantic, Uvicorn
+## 📌 Основные возможности
+
+- **🤖 AI Analysis (Gemini 2.5 Flash)**: Автоматический подсчёт Match Score (0–100%), определение грейда, совпавших и отсутствующих навыков, а также рекомендаций на русском языке.
+- **📊 Web Dashboard**: Встроенный стеклянный веб-интерфейс (Glassmorphism) для управления вакансиями, поиска и мгновенного 1-click импорта.
+- **⚡ 1-Click Remotive Import**: Прямой импорт и анализ IT-вакансий с международной биржи Remotive.
+- **🗄️ PostgreSQL / SQLite Database**: Сохранение всех обработанных вакансий и их аналитики через SQLAlchemy.
+- **📲 Telegram Alerts**: Мгновенные уведомления в Telegram при появлении подходящих вакансий (`match_score >= 70%`).
+- **🔄 n8n Integration**: Готовый к импорту пресет сценария в папке `n8n/`.
+
+## 🛠 Технологический стек
+
+- **Backend:** Python 3.12, FastAPI, Pydantic, SQLAlchemy, HTTPX
+- **AI / LLM:** Google Gemini API (gemini-2.5-flash)
+- **Database:** PostgreSQL (Docker) / SQLite (локально)
+- **Orchestration:** n8n Workflow (`n8n/jobpilot_workflow.json`)
 - **DevOps:** Docker, Docker Compose
-- **Orchestration:** n8n
 
-## 📁 Project Structure
+## 📁 Структура проекта
+
 ```text
 jobpilot-ai/
 ├── backend/
-│   ├── Dockerfile
-│   ├── main.py
-│   └── requirements.txt
-├── .env
+│   ├── static/
+│   │   └── index.html        # Web Dashboard UI
+│   ├── database.py           # SQLAlchemy DB models
+│   ├── telegram.py           # Telegram bot notification module
+│   ├── main.py               # FastAPI core application & API routes
+│   ├── requirements.txt      # Python dependencies
+│   └── Dockerfile            # Container definition
+├── n8n/
+│   └── jobpilot_workflow.json # n8n workflow export template
+├── .env                      # Environment config template
 ├── .gitignore
-├── docker-compose.yml
+├── docker-compose.yml        # Multi-container setup (Backend + PostgreSQL)
 └── README.md
 ```
 
-## 🚀 Getting Started
+## 🚀 Быстрый запуск
 
-### 1. Run with Docker Compose
+### 1. Настройка окружения
+Создайте или отредактируйте файл `.env`:
+```env
+PORT=8000
+HOST=0.0.0.0
+ENVIRONMENT=development
+
+# Gemini API Key (для ИИ скоринга)
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# Telegram Alerts (опционально)
+TELEGRAM_BOT_TOKEN=your_bot_token
+TELEGRAM_CHAT_ID=your_chat_id
+```
+
+### 2. Запуск через Docker Compose (Рекомендуется)
 ```bash
 docker compose up --build
 ```
-API docs will be available at [http://localhost:8000/docs](http://localhost:8000/docs).
+- **Web Dashboard**: [http://localhost:8000](http://localhost:8000)
+- **OpenAPI Swagger Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
 
-### 2. Run locally with Python
+### 3. Локальный запуск на Python
 ```powershell
-python -m venv .venv
-.venv\Scripts\activate
 pip install -r backend\requirements.txt
-uvicorn backend.main:app --reload --port 8000
+python -m uvicorn backend.main:app --reload --port 8000
 ```

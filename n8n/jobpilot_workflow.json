@@ -1,0 +1,72 @@
+{
+  "name": "JobPilot AI - Automatic Job Fetcher & Analyzer",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "1",
+      "name": "Schedule Trigger (Every 6h)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://remotive.com/api/remote-jobs?category=software-dev&limit=10",
+        "options": {}
+      },
+      "id": "2",
+      "name": "Fetch Remotive Jobs",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://backend:8000/analyze",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"job\": {\n    \"title\": \"{{ $json.title }}\",\n    \"company\": \"{{ $json.company_name }}\",\n    \"location\": \"{{ $json.candidate_required_location }}\",\n    \"url\": \"{{ $json.url }}\",\n    \"description\": \"{{ $json.description }}\"\n  }\n}",
+        "options": {}
+      },
+      "id": "3",
+      "name": "Send to JobPilot AI Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [680, 300]
+    }
+  ],
+  "connections": {
+    "Schedule Trigger (Every 6h)": {
+      "main": [
+        [
+          {
+            "node": "Fetch Remotive Jobs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Remotive Jobs": {
+      "main": [
+        [
+          {
+            "node": "Send to JobPilot AI Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

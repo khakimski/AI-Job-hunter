@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JobPilot AI 🚀 — AI Career Assistant</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #0a0e17;
+            --bg-card: rgba(22, 28, 45, 0.7);
+            --bg-card-hover: rgba(30, 40, 65, 0.85);
+            --border-color: rgba(255, 255, 255, 0.08);
+            --accent-primary: #6366f1;
+            --accent-secondary: #a855f7;
+            --accent-gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 50%, #ec4899 100%);
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(circle at 15% 15%, rgba(99, 102, 241, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 85% 85%, rgba(168, 85, 247, 0.12) 0%, transparent 40%);
+            background-attachment: fixed;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+            padding: 2rem 1.5rem;
+        }
+
+        /* Header */
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 2rem;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 2.5rem;
+        }
+
+        .logo-group {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .logo-icon {
+            width: 44px;
+            height: 44px;
+            background: var(--accent-gradient);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.3);
+        }
+
+        .logo-text h1 {
+            font-size: 1.6rem;
+            font-weight: 800;
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .logo-text p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .btn {
+            padding: 0.75rem 1.4rem;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            border: none;
+            transition: all 0.25s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: var(--accent-gradient);
+            color: #ffffff;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.35);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-main);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateY(-2px);
+        }
+
+        /* Metrics Bar */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1.25rem;
+            margin-bottom: 2.5rem;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.5rem;
+            transition: transform 0.2s ease;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-4px);
+        }
+
+        .stat-title {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 0.5rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .stat-value {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: var(--text-main);
+        }
+
+        /* Filter Controls */
+        .controls-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .search-box {
+            position: relative;
+            flex: 1;
+            min-width: 280px;
+        }
+
+        .search-box input {
+            width: 100%;
+            padding: 0.8rem 1.2rem 0.8rem 2.8rem;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            color: var(--text-main);
+            font-size: 0.95rem;
+            outline: none;
+        }
+
+        .search-box input:focus {
+            border-color: var(--accent-primary);
+            box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.2);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 1rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+        }
+
+        /* Job Cards Grid */
+        .jobs-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .job-card {
+            background: var(--bg-card);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color);
+            border-radius: 18px;
+            padding: 1.5rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .job-card:hover {
+            background: var(--bg-card-hover);
+            border-color: rgba(99, 102, 241, 0.3);
+            transform: translateY(-6px);
+            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 1rem;
+        }
+
+        .job-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 0.3rem;
+            line-height: 1.3;
+        }
+
+        .company-name {
+            font-size: 0.9rem;
+            color: var(--accent-primary);
+            font-weight: 500;
+        }
+
+        .score-badge {
+            padding: 0.4rem 0.8rem;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 0.3rem;
+            flex-shrink: 0;
+        }
+
+        .score-high {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--success);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .score-medium {
+            background: rgba(245, 158, 11, 0.15);
+            color: var(--warning);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+        }
+
+        .score-low {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--danger);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .summary-box {
+            font-size: 0.88rem;
+            color: var(--text-muted);
+            margin-bottom: 1.2rem;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 0.8rem;
+            border-radius: 10px;
+            border-left: 3px solid var(--accent-primary);
+        }
+
+        .skills-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.4rem;
+            margin-bottom: 1.2rem;
+        }
+
+        .skill-tag {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.6rem;
+            border-radius: 6px;
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--text-main);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .skill-match {
+            background: rgba(99, 102, 241, 0.2);
+            color: #a5b4fc;
+            border-color: rgba(99, 102, 241, 0.4);
+        }
+
+        .card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-color);
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* Modal styling */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(10, 14, 23, 0.8);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .modal-overlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .modal-card {
+            background: #111827;
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            width: 90%;
+            max-width: 600px;
+            padding: 2rem;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+
+        .form-group {
+            margin-bottom: 1.2rem;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 0.4rem;
+        }
+
+        .form-group input, .form-group textarea {
+            width: 100%;
+            padding: 0.8rem;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-main);
+            outline: none;
+        }
+
+        .loader {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <div class="logo-group">
+                <div class="logo-icon">🚀</div>
+                <div class="logo-text">
+                    <h1>JobPilot AI</h1>
+                    <p>Smart AI Vacancy Analysis & Match Assistant</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button class="btn btn-secondary" onclick="importFromRemotive()" id="importBtn">
+                    ⚡ Импорт с Remotive API
+                </button>
+                <button class="btn btn-primary" onclick="openModal()">
+                    + Проанализировать вакансию
+                </button>
+            </div>
+        </header>
+
+        <!-- Stats Bar -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-title">Всего обработано</div>
+                <div class="stat-value" id="totalJobs">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">Высокий Match (70%+)</div>
+                <div class="stat-value" style="color: var(--success)" id="highMatchJobs">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-title">Среднее совпадение</div>
+                <div class="stat-value" style="color: var(--accent-secondary)" id="avgMatchScore">0%</div>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="controls-bar">
+            <div class="search-box">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="searchInput" placeholder="Поиск по названию, компании или навыкам..." oninput="filterJobs()">
+            </div>
+        </div>
+
+        <!-- Jobs Grid -->
+        <div class="jobs-grid" id="jobsGrid">
+            <!-- Dynamically populated -->
+        </div>
+    </div>
+
+    <!-- Modal for Manual Job Analysis -->
+    <div class="modal-overlay" id="analysisModal">
+        <div class="modal-card">
+            <h2 style="margin-bottom: 1.5rem;">Анализ вакансии через ИИ</h2>
+            <form id="jobForm" onsubmit="submitJobAnalysis(event)">
+                <div class="form-group">
+                    <label>Название должности</label>
+                    <input type="text" id="jobTitle" required placeholder="Python FastAPI / AI Developer">
+                </div>
+                <div class="form-group">
+                    <label>Компания</label>
+                    <input type="text" id="jobCompany" placeholder="Tech Startup">
+                </div>
+                <div class="form-group">
+                    <label>Описание вакансии (текст / требования)</label>
+                    <textarea id="jobDescription" rows="5" required placeholder="Ищем Middle/Senior Python разработчика. Требования: FastAPI, Docker, PostgreSQL, Gemini API..."></textarea>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Отмена</button>
+                    <button type="submit" class="btn btn-primary" id="submitBtn">
+                        Запустить AI-Анализ
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let allJobs = [];
+
+        async function fetchJobs() {
+            try {
+                const res = await fetch('/jobs');
+                if (res.ok) {
+                    allJobs = await res.json();
+                    renderJobs(allJobs);
+                    updateStats(allJobs);
+                }
+            } catch (err) {
+                console.error("Failed to fetch jobs:", err);
+            }
+        }
+
+        function updateStats(jobs) {
+            document.getElementById('totalJobs').innerText = jobs.length;
+            const highMatch = jobs.filter(j => j.match_score >= 70).length;
+            document.getElementById('highMatchJobs').innerText = highMatch;
+            
+            const avg = jobs.length > 0 
+                ? Math.round(jobs.reduce((acc, j) => acc + j.match_score, 0) / jobs.length) 
+                : 0;
+            document.getElementById('avgMatchScore').innerText = avg + '%';
+        }
+
+        function renderJobs(jobs) {
+            const grid = document.getElementById('jobsGrid');
+            if (jobs.length === 0) {
+                grid.innerHTML = `
+                    <div style="grid-column: 1/-1; text-align: center; padding: 4rem 1rem; color: var(--text-muted);">
+                        <h3>Пока нет сохранённых вакансий</h3>
+                        <p style="margin-top: 0.5rem">Нажмите <strong>"+ Проанализировать вакансию"</strong> или <strong>"⚡ Импорт с Remotive API"</strong></p>
+                    </div>
+                `;
+                return;
+            }
+
+            grid.innerHTML = jobs.map(job => {
+                let badgeClass = 'score-low';
+                if (job.match_score >= 70) badgeClass = 'score-high';
+                else if (job.match_score >= 50) badgeClass = 'score-medium';
+
+                const matchingTags = (job.matching_skills || []).map(s => `<span class="skill-tag skill-match">✓ ${s}</span>`).join('');
+                const missingTags = (job.missing_skills || []).map(s => `<span class="skill-tag">✗ ${s}</span>`).join('');
+
+                return `
+                    <div class="job-card">
+                        <div>
+                            <div class="card-header">
+                                <div>
+                                    <div class="job-title">${job.title}</div>
+                                    <div class="company-name">${job.company || 'Компания не указана'}</div>
+                                </div>
+                                <div class="score-badge ${badgeClass}">${job.match_score}%</div>
+                            </div>
+                            <div class="summary-box">
+                                ${job.summary || 'Анализ завершен.'}
+                            </div>
+                            <div class="skills-list">
+                                ${matchingTags}
+                                ${missingTags}
+                            </div>
+                        </div>
+                        <div class="card-footer">
+                            <span>Грейд: <strong>${job.seniority_level || 'N/A'}</strong></span>
+                            <span>${job.created_at ? new Date(job.created_at).toLocaleDateString('ru-RU') : ''}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function filterJobs() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const filtered = allJobs.filter(j => 
+                j.title.toLowerCase().includes(query) || 
+                (j.company && j.company.toLowerCase().includes(query)) ||
+                (j.matching_skills && j.matching_skills.some(s => s.toLowerCase().includes(query)))
+            );
+            renderJobs(filtered);
+        }
+
+        function openModal() {
+            document.getElementById('analysisModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('analysisModal').classList.remove('active');
+        }
+
+        async function submitJobAnalysis(event) {
+            event.preventDefault();
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.innerHTML = `<span class="loader"></span> Анализируем...`;
+            submitBtn.disabled = true;
+
+            const jobPayload = {
+                job: {
+                    title: document.getElementById('jobTitle').value,
+                    company: document.getElementById('jobCompany').value,
+                    description: document.getElementById('jobDescription').value
+                }
+            };
+
+            try {
+                const res = await fetch('/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(jobPayload)
+                });
+                if (res.ok) {
+                    closeModal();
+                    document.getElementById('jobForm').reset();
+                    fetchJobs();
+                } else {
+                    alert("Ошибка при анализе вакансии");
+                }
+            } catch (err) {
+                alert("Ошибка сети: " + err.message);
+            } finally {
+                submitBtn.innerHTML = `Запустить AI-Анализ`;
+                submitBtn.disabled = false;
+            }
+        }
+
+        async function importFromRemotive() {
+            const btn = document.getElementById('importBtn');
+            btn.innerHTML = `<span class="loader"></span> Импортируем...`;
+            btn.disabled = true;
+
+            try {
+                const res = await fetch('/import/remotive', { method: 'POST' });
+                if (res.ok) {
+                    const data = await res.json();
+                    alert(`Импортировано и проанализировано вакансий: ${data.imported_count}`);
+                    fetchJobs();
+                } else {
+                    alert("Ошибка импорта с Remotive API");
+                }
+            } catch (err) {
+                alert("Не удалось загрузить вакансии с Remotive: " + err.message);
+            } finally {
+                btn.innerHTML = `⚡ Импорт с Remotive API`;
+                btn.disabled = false;
+            }
+        }
+
+        // Initial fetch on load
+        fetchJobs();
+    </script>
+</body>
+</html>
