@@ -139,6 +139,15 @@ def get_jobs(min_score: int = 0, limit: int = 50, db: Session = Depends(get_db))
     ]
 
 
+@app.delete("/jobs/clear_all")
+def clear_all_jobs(db: Session = Depends(get_db)):
+    """Delete all jobs from the database."""
+    deleted_count = db.query(JobRecord).count()
+    db.query(JobRecord).delete()
+    db.commit()
+    return {"status": "ok", "deleted_count": deleted_count}
+
+
 @app.post("/analyze", response_model=JobAnalysisResponse)
 async def analyze_job(request: JobAnalysisRequest, db: Session = Depends(get_db)):
     job = request.job

@@ -451,11 +451,15 @@
                 <button class="btn btn-secondary" onclick="importAllSites()" id="importAllBtn">
                     🌐 Сканировать Все сайты
                 </button>
+                <button class="btn btn-secondary" style="border-color: rgba(239,68,68,0.4); color: #fca5a5;" onclick="clearAllJobs()" id="clearAllBtn">
+                    🗑️ Очистить все
+                </button>
                 <button class="btn btn-primary" onclick="openAnalysisModal()">
                     + Вставить вакансию вручную
                 </button>
             </div>
         </header>
+
 
         <!-- Active Resume Banner -->
         <div class="resume-banner">
@@ -805,9 +809,27 @@
             }
         }
 
-
-
-
+        async function clearAllJobs() {
+            if (!confirm('Удалить все вакансии из базы данных? Это действие необратимо.')) return;
+            const btn = document.getElementById('clearAllBtn');
+            btn.innerHTML = `<span class="loader"></span>`;
+            btn.disabled = true;
+            try {
+                const res = await fetch('/jobs/clear_all', { method: 'DELETE' });
+                if (res.ok) {
+                    const data = await res.json();
+                    fetchJobs();
+                    alert(`🗑️ Удалено вакансий: ${data.deleted_count}`);
+                } else {
+                    alert('Ошибка при очистке базы');
+                }
+            } catch (err) {
+                alert('Ошибка: ' + err.message);
+            } finally {
+                btn.innerHTML = `🗑️ Очистить все`;
+                btn.disabled = false;
+            }
+        }
 
         // Initial fetch on load
         fetchProfile();
