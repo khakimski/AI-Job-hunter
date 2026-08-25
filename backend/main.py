@@ -10,8 +10,13 @@ from sqlalchemy.orm import Session
 import httpx
 from dotenv import load_dotenv
 
-from database import init_db, get_db, JobRecord
-from telegram import send_telegram_alert
+try:
+    from backend.database import init_db, get_db, JobRecord
+    from backend.telegram import send_telegram_alert
+except ModuleNotFoundError:
+    from database import init_db, get_db, JobRecord
+    from telegram import send_telegram_alert
+
 
 load_dotenv()
 init_db()
